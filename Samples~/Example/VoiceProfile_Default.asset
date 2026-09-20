@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 372c3ba44dc395c4faf7deaad328cd03, type: 3}
+  m_Name: VoiceProfile_Default
+  m_EditorClassIdentifier: Majulizi.Animalese::Majulizi.Animalese.VoiceProfileSO
+  phonemeMap: {fileID: 11400000, guid: 730ed501368cbbe4c9c8cb8a9a77750e, type: 2}
+  volume: 1
+  basePitch: 1.495
+  pitchJitter: 0.08
+  questionPitchRise: 0.35
+  speechRate: 1
+  baseInterval: 0.06
+  phonemeStep: 1
+  enableLowPass: 0
+  lowPassCutoff: 5000
+  lowPassResonance: 1
+  enableHighPass: 0
+  highPassCutoff: 1000
+  highPassResonance: 1

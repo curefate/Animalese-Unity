@@ -1,0 +1,19 @@
+{
+    "name": "Majulizi.Animalese.Samples",
+    "rootNamespace": "Majulizi.Animalese.Samples",
+    "references": [
+        "Majulizi.Animalese",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
+
