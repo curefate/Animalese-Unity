@@ -29,7 +29,18 @@ A lightweight, zero-dependency, procedural "Animalese" speech synthesizer for Un
 
 ## Quick Start
 
-### 1. Basic Playback via Code
+### 1. Installation
+
+Install via the Unity Package Manager (UPM):
+1. In the Unity Editor, open **Window** > **Package Manager**.
+2. Click the `+` button at the top-left and choose **Add package from git URL...**.
+3. Enter the repository URL and click **Add**:
+   ```
+   https://github.com/curefate/Animalese-Unity.git
+   ```
+4. *(Optional)* Once installed, select **Animalese** in the Package Manager list, expand the **Samples** section, and click **Import** next to **Example** to try out pre-configured voice profiles, audio assets, and an interactive demo scene (requires TextMeshPro).
+
+### 2. Basic Playback via Code
 
 Attach an `AnimalesePlayer` component to a GameObject with an `AudioSource`, assign a `VoiceProfileSO`, and call:
 
@@ -54,7 +65,7 @@ public class DialogueExample : MonoBehaviour
 }
 ```
 
-### 2. Synchronizing with TextMeshPro Typewriter
+### 3. Synchronizing with TextMeshPro Typewriter
 
 ```csharp
 using TMPro;
@@ -106,6 +117,8 @@ Once imported via the Unity Package Manager, you can import the **Example** samp
 - Includes ready-to-use audio samples (`eileen2`).
 - A pre-configured `PhonemeMap_Eileen2.asset` and `VoiceProfile_Default.asset`.
 - An interactive demo scene with an input field, button, and synced TMP typewriter display (`AnimaleseSampleTypewriter.cs`).
+
+> **Note:** The Example sample requires **TextMeshPro**.
 
 ---
 

@@ -23,7 +23,7 @@
   "samples": [
     {
       "displayName": "Example",
-      "description": "Ready-to-use phoneme assets, character voice profile, and interactive TMP typewriter demo scene.",
+      "description": "Ready-to-use phoneme assets, character voice profile, and interactive TMP typewriter demo scene. (Requires TextMeshPro / com.unity.ugui)",
       "path": "Samples~/Example"
     }
   ],
