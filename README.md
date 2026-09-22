@@ -86,7 +86,11 @@ public class TypewriterExample : MonoBehaviour
         _dialogueText.text = text;
         _dialogueText.maxVisibleCharacters = 0;
 
-        _tokens = AnimaleseParser.Parse(text);
+        // Force TMP to parse tags and extract plain text (supports rich text tags seamlessly)
+        _dialogueText.ForceMeshUpdate();
+        string plainText = _dialogueText.GetParsedText();
+
+        _tokens = AnimaleseParser.Parse(plainText);
 
         _player.OnTokenPlayed += OnTokenPlayed;
         _player.OnPlayCompleted += OnPlayCompleted;
@@ -96,13 +100,13 @@ public class TypewriterExample : MonoBehaviour
 
     private void OnTokenPlayed(VoiceToken token, int index)
     {
-        int nextChar = (index + 1 < _tokens.Count) ? _tokens[index + 1].CharIndex : _fullText.Length;
+        int nextChar = (index + 1 < _tokens.Count) ? _tokens[index + 1].CharIndex : _dialogueText.textInfo.characterCount;
         _dialogueText.maxVisibleCharacters = nextChar;
     }
 
     private void OnPlayCompleted()
     {
-        _dialogueText.maxVisibleCharacters = _fullText.Length;
+        _dialogueText.maxVisibleCharacters = _dialogueText.textInfo.characterCount;
         _player.OnTokenPlayed -= OnTokenPlayed;
         _player.OnPlayCompleted -= OnPlayCompleted;
     }

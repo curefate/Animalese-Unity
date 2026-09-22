@@ -176,18 +176,17 @@ namespace Majulizi.Animalese
                     continue;
                 }
 
-                // 8. 非英文字符（中文、日文等）：生成留空的 PhonemeId，保留原字符，由播放器在播放时根据 Profile 统一哈希降级
-                tokens.Add(VoiceToken.CreatePhoneme(string.Empty, i, c, pitchOffset: 0f, relativeDuration: 1.0f));
-
-                // 若是 UTF-16 代理对，步进 2
+                // 8. UTF-16 代理对字符（如 Emoji、生僻字等）：不发音，作为短暂停顿展示字符推进打字机
                 if (char.IsSurrogatePair(text, i))
                 {
+                    tokens.Add(VoiceToken.CreatePause(i, c, 0.5f));
                     i += 2;
+                    continue;
                 }
-                else
-                {
-                    i++;
-                }
+
+                // 9. 普通非英文字符（中文、日文假名等基本多语言平面字符）：生成留空的 PhonemeId，保留原字符，由播放器在播放时根据 Profile 统一哈希降级
+                tokens.Add(VoiceToken.CreatePhoneme(string.Empty, i, c, pitchOffset: 0f, relativeDuration: 1.0f));
+                i++;
             }
 
             return tokens;

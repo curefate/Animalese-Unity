@@ -252,8 +252,8 @@ namespace Majulizi.Animalese
                 }
             }
 
-            // 2. Fallback using Unicode codepoint hash for non-English or missing phonemes
-            int codePoint = char.ConvertToUtf32(token.SourceChar.ToString(), 0);
+            // 2. Fallback using character code for non-English or missing phonemes (zero GC allocation)
+            int codePoint = (int)token.SourceChar;
             if (_profile.phonemeMap.GetFallbackClip(codePoint, out _, out var fallbackClip))
             {
                 return fallbackClip;

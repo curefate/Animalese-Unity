@@ -81,19 +81,23 @@ namespace Majulizi.Animalese.Samples
             _outputText.text = _cachedFullText;
             _outputText.maxVisibleCharacters = 0;
 
-            // 3. Parse text into normalized VoiceTokenList
-            _currentTokens = AnimaleseParser.Parse(_cachedFullText);
+            // 3. Force TMP to parse tags immediately and extract plain text for speech parsing
+            _outputText.ForceMeshUpdate();
+            string plainText = _outputText.GetParsedText();
+
+            // 4. Parse plain text into normalized VoiceTokenList
+            _currentTokens = AnimaleseParser.Parse(plainText);
 
             if (_currentTokens == null || _currentTokens.Count == 0)
             {
-                _outputText.maxVisibleCharacters = _cachedFullText.Length;
+                _outputText.maxVisibleCharacters = _outputText.textInfo.characterCount;
                 return;
             }
 
-            // 4. Subscribe to Player events for synchronous typing
+            // 5. Subscribe to Player events for synchronous typing
             BindPlayerEvents();
 
-            // 5. Start audio playback
+            // 6. Start audio playback
             _animalesePlayer.Play(_currentTokens);
         }
 
@@ -103,9 +107,9 @@ namespace Majulizi.Animalese.Samples
         public void Skip()
         {
             StopPlayback();
-            if (_outputText != null && !string.IsNullOrEmpty(_cachedFullText))
+            if (_outputText != null)
             {
-                _outputText.maxVisibleCharacters = _cachedFullText.Length;
+                _outputText.maxVisibleCharacters = _outputText.textInfo.characterCount;
             }
         }
 
@@ -147,7 +151,7 @@ namespace Majulizi.Animalese.Samples
         /// </summary>
         private void HandleTokenPlayed(VoiceToken token, int tokenIndex)
         {
-            if (_outputText == null || string.IsNullOrEmpty(_cachedFullText))
+            if (_outputText == null)
             {
                 return;
             }
@@ -162,10 +166,10 @@ namespace Majulizi.Animalese.Samples
             else
             {
                 // Final token: reveal all characters
-                visibleCount = _cachedFullText.Length;
+                visibleCount = _outputText.textInfo.characterCount;
             }
 
-            _outputText.maxVisibleCharacters = Mathf.Clamp(visibleCount, 0, _cachedFullText.Length);
+            _outputText.maxVisibleCharacters = Mathf.Clamp(visibleCount, 0, _outputText.textInfo.characterCount);
         }
 
         /// <summary>
@@ -175,9 +179,9 @@ namespace Majulizi.Animalese.Samples
         {
             UnbindPlayerEvents();
 
-            if (_outputText != null && !string.IsNullOrEmpty(_cachedFullText))
+            if (_outputText != null)
             {
-                _outputText.maxVisibleCharacters = _cachedFullText.Length;
+                _outputText.maxVisibleCharacters = _outputText.textInfo.characterCount;
             }
         }
     }
