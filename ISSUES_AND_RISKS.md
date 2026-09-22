@@ -9,8 +9,8 @@
 | 状态 | 条目 ID | 类型 / 领域 | 严重程度 | 涉及文件 | 简述 |
 | :---: | :--- | :--- | :---: | :--- | :--- |
 | [x] | **[BUG-01](#bug-01-utf-16-代理对emoji--高位字符引发-argumentexception-崩溃)** | 稳定性缺陷 | **高 (Critical)** | `AnimaleseParser.cs`, `AnimalesePlayer.cs` | 包含 Emoji 或扩展 Unicode 字符时，代理对导致运行时抛出 `ArgumentException` 崩溃 **(已修复：静音短停顿处理 + 避免 ConvertToUtf32)** |
-| [ ] | **[BUG-02](#bug-02-phonememapsoautopopulatefromsamples-在-upm-模式下路径失效)** | 工具链缺陷 | **中 (Medium)** | `PhonemeMapSO.cs` | `Samples~` 目录被 Unity 忽略，导致 Editor 下 ContextMenu 自动提取音频彻底失效 |
-| [ ] | **[BUG-03](#bug-03-低帧率追帧时的音频瞬间堆叠并发与-pitch-互相踩踏)** | 音频逻辑 | **中 (Medium)** | `AnimalesePlayer.cs` | 掉帧时 `while` 循环连续消费 token，导致同一帧触发多次 `PlayOneShot` 并覆盖 pitch，产生爆音 |
+| [x] | **[BUG-02](#bug-02-phonememapsoautopopulatefromsamples-在-upm-模式下路径失效)** | 工具链缺陷 | **中 (Medium)** | `PhonemeMapSO.cs` | `Samples~` 目录被 Unity 忽略导致 ContextMenu 提取音频失效 **(已解决：直接删除无用脚手架方法，净化 Runtime 核心)** |
+| [x] | **[BUG-03](#bug-03-低帧率追帧时的音频瞬间堆叠并发与-pitch-互相踩踏)** | 音频逻辑 | **中 (Medium)** | `AnimalesePlayer.cs` | 掉帧时 while 循环连续消费 token 导致爆音 **(已修复：单帧音频限流至多发声 1 次 + 时间透支下限)** |
 | [x] | **[PERF-01](#perf-01-findclipfortoken-每次播放非英文字符均产生-string-堆分配)** | 性能与 GC | **中 (Medium)** | `AnimalesePlayer.cs` | 非英文字符播放时每次都 `ToString()` 分配新字符串用于 `char.ConvertToUtf32` **(已修复：直接转为 int 消除 GC)** |
 | [ ] | **[PERF-02](#perf-02-animaleseparser-解析期间大量临时字符串分配)** | 性能与 GC | **中 (Medium)** | `AnimaleseParser.cs` | 英文贪心双音素拼接与单字母 `ToString()` 产生不必要的堆分配 |
 | [ ] | **[PERF-03](#perf-03-voicetokenlist-内部双重分配冗余)** | 性能与 GC | **低 (Low)** | `VoiceToken.cs` | 声明字段处与无参构造函数处重复 `new List<VoiceToken>()`，产生多余的垃圾对象 |
@@ -39,47 +39,26 @@
 
 ---
 
-### - [ ] [BUG-02] PhonemeMapSO.AutoPopulateFromSamples 在 UPM 模式下路径失效
+### - [x] [BUG-02] PhonemeMapSO.AutoPopulateFromSamples 在 UPM 模式下路径失效
 
 - **涉及文件**：
-  - `Runtime/PhonemeMapSO.cs` (行 122)
+  - `Runtime/PhonemeMapSO.cs`
 - **问题描述**：
-  ```csharp
-  const string samplePath = "Packages/com.majulizi.animalese/Samples/Example/eileen2";
-  var guids = UnityEditor.AssetDatabase.FindAssets("t:AudioClip", new[] { samplePath });
-  ```
-  在 Unity UPM 规范中，包含示例的目录被命名为 `Samples~`（末尾带波浪号）。Unity 引擎在构建 AssetDatabase 时会**强制忽略**所有以 `~` 结尾的文件夹。因此，通过 Package Manager 引用此包时，该路径下根本不会生成任何 Asset GUID，该 ContextMenu 函数在导入前或安装后均无法正常工作。
-- **讨论要点**：
-  - 该菜单项是否应改用 `System.IO` 物理路径遍历并利用 `AssetDatabase.ImportAsset`？
-  - 或者改为搜索用户工程已导入的示例路径（例如 `Assets/Samples/Animalese/...`）？
-  - 或者将默认示例预制体直接作为 Package 的 Runtime 基础资源固化，不再依赖此菜单？
+  原代码中包含硬编码针对特定 Sample 路径的右键 ContextMenu 方法，在 UPM 安装模式下因 `Samples~` 忽略规则而彻底失效，且对第三方包使用者没有任何通用价值，具有误导性。
+- **解决结果**：
+  - 确认该功能仅为开发初期的一次性临时脚手架，预制好的 `PhonemeMap_Eileen2.asset` 数据已独立序列化保存，直接将无用的 ContextMenu 方法从 `Runtime/PhonemeMapSO.cs` 中移除，净化 Runtime 核心。
 
 ---
 
-### - [ ] [BUG-03] 低帧率/追帧时的音频瞬间堆叠并发与 Pitch 互相踩踏
+### - [x] [BUG-03] 低帧率/追帧时的音频瞬间堆叠并发与 Pitch 互相踩踏
 
 - **涉及文件**：
-  - `Runtime/AnimalesePlayer.cs` (行 87~101)
+  - `Runtime/AnimalesePlayer.cs` (行 87~101, 203~240)
 - **问题描述**：
-  在 `AnimalesePlayer.Update` 中：
-  ```csharp
-  _timer -= Time.deltaTime * Mathf.Max(0.01f, _speedMultiplier);
-  while (_timer <= 0f && _isPlaying)
-  {
-      VoiceToken token = _tokens[_currentIndex];
-      ProcessToken(token);
-      _currentIndex++;
-  }
-  ```
-  当游戏出现帧率波动（如掉帧至 15~20 FPS，或切换场景发生卡顿）时，`Time.deltaTime` 会远大于单个音素的 `duration`（通常仅为 0.04~0.06s）。此时 `while` 循环会在**同一帧内连续执行多次 `ProcessToken`**。
-  在 `ProcessToken` 内部：
-  1. 多次触发 `_audioSource.pitch = ...`：后一个音素的 pitch 会立刻覆盖前一个刚触发的 pitch。
-  2. 多次调用 `_audioSource.PlayOneShot(clip, finalVolume)`：多个音素音频在同一瞬间并发叠加。
-  3. **后果**：玩家会听到严重的“爆音”、“金属重叠杂音”或发音破裂。
-- **讨论要点**：
-  - 掉帧时，打字机文本应立即推进，但音频播放是否应当限制发声频率？
-  - 方案 A：单帧最多仅允许发声 1 次（丢弃多余发声，仅触发打字机事件）。
-  - 方案 B：增加计时器最大透支上限（Time Debt Clamping），防止一次性追帧过多。
+  在帧率波动或发生卡顿掉帧时，`Time.deltaTime` 较大，`while` 循环在同一帧内连续消费多个音素 Token，导致同一瞬间对 `_audioSource` 触发多次 `PlayOneShot` 并连续覆盖 `pitch`，产生爆音、失真或杂音重叠。
+- **解决结果**：
+  - **单帧音频发声限流（Rate Limiting）**：在 `Update` 追帧循环中加入单帧发声标志位，当帧内已有音素发声后，后续因追赶而消费的 Token 仅推进时长和触发 `OnTokenPlayed` 打字机事件，跳过物理发声，杜绝音频爆破与音高踩踏。同时使高倍速快进播放听感更加自然密集。
+  - **防卡顿螺旋透支保护**：增加 `_timer = Mathf.Max(_timer, -0.2f);`，防止切场景或极重度卡顿时死循环追赶。
 
 ---
 

@@ -86,6 +86,11 @@ namespace Majulizi.Animalese
             // Advance timer (supports dynamic speed changes)
             _timer -= Time.deltaTime * Mathf.Max(0.01f, _speedMultiplier);
 
+            // Clamp maximum time debt to prevent spiral of catch-up loops during extreme framerate drops
+            _timer = Mathf.Max(_timer, -0.2f);
+
+            bool playedAudioThisFrame = false;
+
             while (_timer <= 0f && _isPlaying)
             {
                 if (_currentIndex >= _tokens.Count)
@@ -95,7 +100,7 @@ namespace Majulizi.Animalese
                 }
 
                 VoiceToken token = _tokens[_currentIndex];
-                ProcessToken(token);
+                ProcessToken(token, ref playedAudioThisFrame);
                 _currentIndex++;
             }
         }
@@ -198,7 +203,7 @@ namespace Majulizi.Animalese
             _speedMultiplier = Mathf.Max(0.1f, multiplier);
         }
 
-        private void ProcessToken(VoiceToken token)
+        private void ProcessToken(VoiceToken token, ref bool playedAudioThisFrame)
         {
             // 1. Calculate physical time required for this token
             float baseInterval = _profile != null ? _profile.baseInterval : 0.06f;
@@ -214,20 +219,26 @@ namespace Majulizi.Animalese
 
                 if (_phonemeStepCounter % step == 0)
                 {
-                    AudioClip clip = FindClipForToken(token);
-                    if (clip != null && _audioSource != null)
+                    // Rate-limit audio playback to at most once per frame to prevent cacophony and pitch overrides
+                    if (!playedAudioThisFrame)
                     {
-                        float basePitch = _profile != null ? _profile.basePitch : 1.0f;
-                        float riseFactor = _profile != null ? _profile.questionPitchRise : 0.35f;
-                        float jitterRange = _profile != null ? _profile.pitchJitter : 0.08f;
-                        float jitter = UnityEngine.Random.Range(-jitterRange, jitterRange);
+                        AudioClip clip = FindClipForToken(token);
+                        if (clip != null && _audioSource != null)
+                        {
+                            float basePitch = _profile != null ? _profile.basePitch : 1.0f;
+                            float riseFactor = _profile != null ? _profile.questionPitchRise : 0.35f;
+                            float jitterRange = _profile != null ? _profile.pitchJitter : 0.08f;
+                            float jitter = UnityEngine.Random.Range(-jitterRange, jitterRange);
 
-                        float finalPitch = basePitch * (1.0f + token.PitchOffset * riseFactor) + jitter;
-                        _audioSource.pitch = Mathf.Clamp(finalPitch, 0.1f, 3.0f);
+                            float finalPitch = basePitch * (1.0f + token.PitchOffset * riseFactor) + jitter;
+                            _audioSource.pitch = Mathf.Clamp(finalPitch, 0.1f, 3.0f);
 
-                        float baseVolume = _profile != null ? _profile.volume : 1.0f;
-                        float finalVolume = Mathf.Clamp01(baseVolume * token.VolumeScale);
-                        _audioSource.PlayOneShot(clip, finalVolume);
+                            float baseVolume = _profile != null ? _profile.volume : 1.0f;
+                            float finalVolume = Mathf.Clamp01(baseVolume * token.VolumeScale);
+                            _audioSource.PlayOneShot(clip, finalVolume);
+
+                            playedAudioThisFrame = true;
+                        }
                     }
                 }
             }

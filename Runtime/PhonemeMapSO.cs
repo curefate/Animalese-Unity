@@ -114,36 +114,5 @@ namespace Majulizi.Animalese
             phonemeId = _validPhonemeIds[index];
             return _clipLookup.TryGetValue(phonemeId, out clip);
         }
-
-#if UNITY_EDITOR
-        [ContextMenu("Auto Populate Eileen Phonemes From Samples")]
-        public void AutoPopulateFromSamples()
-        {
-            const string samplePath = "Packages/com.majulizi.animalese/Samples/Example/eileen2";
-            var guids = UnityEditor.AssetDatabase.FindAssets("t:AudioClip", new[] { samplePath });
-            if (guids == null || guids.Length == 0)
-            {
-                Debug.LogWarning($"[PhonemeMapSO] No AudioClip assets found at {samplePath}.");
-                return;
-            }
-
-            var list = new List<Phone>();
-            foreach (var guid in guids)
-            {
-                var path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-                var clip = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>(path);
-                if (clip != null)
-                {
-                    string id = System.IO.Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
-                    list.Add(new Phone { id = id, clip = clip });
-                }
-            }
-
-            entries_english = list.ToArray();
-            UnityEditor.EditorUtility.SetDirty(this);
-            RebuildLookup();
-            Debug.Log($"[PhonemeMapSO] Successfully populated {entries_english.Length} phonemes from Samples!");
-        }
-#endif
     }
 }
