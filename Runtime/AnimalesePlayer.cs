@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Majulizi.Animalese
@@ -19,7 +20,7 @@ namespace Majulizi.Animalese
         private VoiceProfileSO _profile;
 
         // Runtime state machine fields
-        private VoiceTokenList _tokens;
+        private IReadOnlyList<VoiceToken> _tokens;
         private int _currentIndex = 0;
         private float _timer = 0f;
         private float _speedMultiplier = 1.0f;
@@ -130,7 +131,7 @@ namespace Majulizi.Animalese
         /// <summary>
         /// Plays an existing token list using the currently assigned Profile.
         /// </summary>
-        public void Play(VoiceTokenList tokens)
+        public void Play(IReadOnlyList<VoiceToken> tokens)
         {
             Play(tokens, _profile);
         }
@@ -138,7 +139,7 @@ namespace Majulizi.Animalese
         /// <summary>
         /// Overrides the current Profile and plays an existing token list.
         /// </summary>
-        public void Play(VoiceTokenList tokens, VoiceProfileSO profile)
+        public void Play(IReadOnlyList<VoiceToken> tokens, VoiceProfileSO profile)
         {
             Stop();
 

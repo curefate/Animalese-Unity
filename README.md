@@ -77,7 +77,7 @@ public class TypewriterExample : MonoBehaviour
     [SerializeField] private TMP_Text _dialogueText;
     [SerializeField] private AnimalesePlayer _player;
 
-    private VoiceTokenList _tokens;
+    private List<VoiceToken> _tokens = new List<VoiceToken>();
     private string _fullText;
 
     public void PlayDialogue(string text)
@@ -90,7 +90,8 @@ public class TypewriterExample : MonoBehaviour
         _dialogueText.ForceMeshUpdate();
         string plainText = _dialogueText.GetParsedText();
 
-        _tokens = AnimaleseParser.Parse(plainText);
+        // Zero-allocation parsing by reusing destination list
+        AnimaleseParser.Parse(plainText, _tokens);
 
         _player.OnTokenPlayed += OnTokenPlayed;
         _player.OnPlayCompleted += OnPlayCompleted;

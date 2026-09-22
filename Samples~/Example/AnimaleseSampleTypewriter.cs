@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -27,7 +28,7 @@ namespace Majulizi.Animalese.Samples
 
         // Runtime state fields
         private string _cachedFullText;
-        private VoiceTokenList _currentTokens;
+        private readonly List<VoiceToken> _currentTokens = new List<VoiceToken>();
         private bool _isListening = false;
 
         private void OnDisable()
@@ -85,10 +86,10 @@ namespace Majulizi.Animalese.Samples
             _outputText.ForceMeshUpdate();
             string plainText = _outputText.GetParsedText();
 
-            // 4. Parse plain text into normalized VoiceTokenList
-            _currentTokens = AnimaleseParser.Parse(plainText);
+            // 4. Parse plain text into reusable VoiceToken list (zero allocation)
+            AnimaleseParser.Parse(plainText, _currentTokens);
 
-            if (_currentTokens == null || _currentTokens.Count == 0)
+            if (_currentTokens.Count == 0)
             {
                 _outputText.maxVisibleCharacters = _outputText.textInfo.characterCount;
                 return;

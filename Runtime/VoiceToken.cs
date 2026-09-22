@@ -50,39 +50,4 @@ namespace Majulizi.Animalese
                 : $"[Pause: '{SourceChar}', RelDur: {RelativeDuration:F2}]";
         }
     }
-
-    [Serializable]
-    public class VoiceTokenList : IReadOnlyList<VoiceToken>
-    {
-        [SerializeField]
-        private List<VoiceToken> _tokens = new List<VoiceToken>();
-
-        public VoiceTokenList()
-        {
-            _tokens = new List<VoiceToken>();
-        }
-
-        public VoiceTokenList(IEnumerable<VoiceToken> tokens)
-        {
-            _tokens = new List<VoiceToken>(tokens);
-        }
-
-        public int Count => _tokens.Count;
-
-        public VoiceToken this[int index]
-        {
-            get => _tokens[index];
-            set => _tokens[index] = value;
-        }
-
-        public void Add(VoiceToken token) => _tokens.Add(token);
-
-        public void AddRange(IEnumerable<VoiceToken> tokens) => _tokens.AddRange(tokens);
-
-        public void Clear() => _tokens.Clear();
-
-        public IEnumerator<VoiceToken> GetEnumerator() => _tokens.GetEnumerator();
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-    }
 }

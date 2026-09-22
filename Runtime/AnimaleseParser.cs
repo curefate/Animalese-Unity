@@ -13,19 +13,36 @@ namespace Majulizi.Animalese
         private static readonly string[] Digraphs = { "ch", "sh", "th", "wh", "ph" };
 
         /// <summary>
-        /// Parses the input string into a list of VoiceTokens.
+        /// Parses the input string and allocates a new List of VoiceTokens.
         /// </summary>
-        /// <param name="text">The raw input text (supports English, Chinese, Japanese, and various punctuation marks).</param>
-        public static VoiceTokenList Parse(string text)
+        public static List<VoiceToken> Parse(string text)
         {
-            var tokens = new VoiceTokenList();
+            var tokens = new List<VoiceToken>();
+            Parse(text, tokens);
+            return tokens;
+        }
+
+        /// <summary>
+        /// Parses the input string into the provided destination list (clears existing contents).
+        /// Enables zero-allocation parsing in high-frequency dialogue systems.
+        /// </summary>
+        public static void Parse(string text, List<VoiceToken> results)
+        {
+            if (results == null)
+            {
+                throw new ArgumentNullException(nameof(results));
+            }
+
+            results.Clear();
+
             if (string.IsNullOrEmpty(text))
             {
-                return tokens;
+                return;
             }
 
             int length = text.Length;
             int i = 0;
+            var tokens = results;
 
             while (i < length)
             {
@@ -188,8 +205,6 @@ namespace Majulizi.Animalese
                 tokens.Add(VoiceToken.CreatePhoneme(string.Empty, i, c, pitchOffset: 0f, relativeDuration: 1.0f));
                 i++;
             }
-
-            return tokens;
         }
 
         private static bool IsAsciiLetter(char c)
@@ -200,7 +215,7 @@ namespace Majulizi.Animalese
         /// <summary>
         /// Extends the playback duration of the most recent active phoneme token.
         /// </summary>
-        private static void ExtendLastPhonemeDuration(VoiceTokenList tokens, float extendDuration)
+        private static void ExtendLastPhonemeDuration(List<VoiceToken> tokens, float extendDuration)
         {
             for (int k = tokens.Count - 1; k >= 0; k--)
             {
@@ -217,7 +232,7 @@ namespace Majulizi.Animalese
         /// <summary>
         /// Applies a pitch offset to the most recent active phoneme token.
         /// </summary>
-        private static void ApplyPitchOffsetToLastPhoneme(VoiceTokenList tokens, float pitchOffset)
+        private static void ApplyPitchOffsetToLastPhoneme(List<VoiceToken> tokens, float pitchOffset)
         {
             for (int k = tokens.Count - 1; k >= 0; k--)
             {
@@ -234,7 +249,7 @@ namespace Majulizi.Animalese
         /// <summary>
         /// Retroactively emphasizes ending phonemes for questions, exclamations, or combined punctuation.
         /// </summary>
-        private static void ApplyPunctuationEmphasis(VoiceTokenList tokens, float pitchRiseLast, float pitchRiseSecond, float volumeScaleLast, float volumeScaleSecond)
+        private static void ApplyPunctuationEmphasis(List<VoiceToken> tokens, float pitchRiseLast, float pitchRiseSecond, float volumeScaleLast, float volumeScaleSecond)
         {
             int phonemesFound = 0;
             int lastIndex = -1;
@@ -284,7 +299,7 @@ namespace Majulizi.Animalese
         /// <summary>
         /// Applies decrescendo (volume fade and slight pitch drop) to preceding phonemes before an ellipsis.
         /// </summary>
-        private static void ApplyDecrescendo(VoiceTokenList tokens)
+        private static void ApplyDecrescendo(List<VoiceToken> tokens)
         {
             int phonemesFound = 0;
             for (int k = tokens.Count - 1; k >= 0; k--)

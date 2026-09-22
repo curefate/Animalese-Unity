@@ -13,11 +13,11 @@
 | [x] | **[BUG-03](#bug-03-低帧率追帧时的音频瞬间堆叠并发与-pitch-互相踩踏)** | 音频逻辑 | **中 (Medium)** | `AnimalesePlayer.cs` | 掉帧时 while 循环连续消费 token 导致爆音 **(已修复：单帧音频限流至多发声 1 次 + 时间透支下限)** |
 | [x] | **[PERF-01](#perf-01-findclipfortoken-每次播放非英文字符均产生-string-堆分配)** | 性能与 GC | **中 (Medium)** | `AnimalesePlayer.cs` | 非英文字符播放时每次都 `ToString()` 分配新字符串用于 `char.ConvertToUtf32` **(已修复：直接转为 int 消除 GC)** |
 | [ ] | **[PERF-02](#perf-02-animaleseparser-解析期间大量临时字符串分配)** | 性能与 GC | **中 (Medium)** | `AnimaleseParser.cs` | 英文贪心双音素拼接与单字母 `ToString()` 产生不必要的堆分配 |
-| [ ] | **[PERF-03](#perf-03-voicetokenlist-内部双重分配冗余)** | 性能与 GC | **低 (Low)** | `VoiceToken.cs` | 声明字段处与无参构造函数处重复 `new List<VoiceToken>()`，产生多余的垃圾对象 |
+| [x] | **[PERF-03](#perf-03-voicetokenlist-内部双重分配冗余)** | 性能与 GC | **低 (Low)** | `VoiceToken.cs` | 冗余的包装类分配 **(已解决：直接废弃 VoiceTokenList，全面拥抱原生泛型容器)** |
 | [ ] | **[PERF-04](#perf-04-运行时动态-addcomponent-音频滤波器的开销与状态管理)** | 性能与架构 | **低 (Low)** | `AnimalesePlayer.cs` | 动态 `AddComponent<AudioFilter>` 产生单帧卡顿与潜在的组件残留隐患 |
 | [x] | **[FEAT-01](#feat-01-缺失-textmeshpro-富文本标签rich-text-tags过滤穿透支持)** | 功能扩展 | **高 (High)** | `AnimaleseSampleTypewriter.cs`, `README.md` | 通过 TMP 的 `GetParsedText()` 提取平文本给 Parser，完美兼容富文本并与打字机绝对同步 **(已完美解决)** |
 | [ ] | **[FEAT-02](#feat-02-标点重音回溯判定在复合短句下的边界处理)** | 韵律体验 | **低 (Low)** | `AnimaleseParser.cs` | 逗号等短暂停顿在特定语法结构下可能会被重音回溯越界穿透 |
-| [ ] | **[FEAT-03](#feat-03-缺乏对象池或零分配解析重载支持)** | 架构设计 | **低 (Low)** | `AnimaleseParser.cs`, `VoiceToken.cs` | 每次调用 `Play(string)` 都创建新的 `VoiceTokenList`，缺乏复用现有列表的重载 |
+| [x] | **[FEAT-03](#feat-03-缺乏对象池或零分配解析重载支持)** | 架构设计 | **低 (Low)** | `AnimaleseParser.cs`, `AnimalesePlayer.cs` | 缺乏复用现有列表的重载 **(已解决：新增 Parse(text, results) 零分配重载，Player 接口对齐 IReadOnlyList)** |
 | [ ] | **[FEAT-04](#feat-04-双音素硬编码于代码中缺乏外部扩展性)** | 架构扩展 | **低 (Low)** | `AnimaleseParser.cs` | `Digraphs` 仅硬编码了英文 5 组组合，无法配置扩展日文罗马字或拼音音节 |
 
 ---
@@ -94,23 +94,14 @@
 
 ---
 
-### - [ ] [PERF-03] VoiceTokenList 内部双重分配冗余
+### - [x] [PERF-03] VoiceTokenList 内部双重分配冗余
 
 - **涉及文件**：
-  - `Runtime/VoiceToken.cs` (行 58, 62)
+  - `Runtime/VoiceToken.cs`
 - **问题描述**：
-  ```csharp
-  [SerializeField]
-  private List<VoiceToken> _tokens = new List<VoiceToken>(); // 1. 字段声明时分配了一次
-
-  public VoiceTokenList()
-  {
-      _tokens = new List<VoiceToken>(); // 2. 无参构造函数中再次重新分配覆盖
-  }
-  ```
-  每次执行 `new VoiceTokenList()`，都会在堆上分配两个 `List<VoiceToken>` 对象，第一个瞬间沦为垃圾内存。
-- **讨论要点**：
-  - 删除构造函数内的多余 `new` 即可。
+  原 `VoiceTokenList` 自定义类不仅产生包装堆分配，还在字段声明与构造函数中重复 `new List<VoiceToken>()` 分配冗余对象。
+- **解决结果**：
+  - 彻底移除 `VoiceTokenList` 类，全面使用 C# 原生 `List<VoiceToken>` 与 `IReadOnlyList<VoiceToken>`。消除多余包装与冗余 List 分配，降低学习成本，天然兼容标准泛型池化工具。
 
 ---
 
@@ -163,17 +154,18 @@
 
 ---
 
-### - [ ] [FEAT-03] 缺乏对象池或零分配解析重载支持
+### - [x] [FEAT-03] 缺乏对象池或零分配解析重载支持
 
 - **涉及文件**：
   - `Runtime/AnimaleseParser.cs`
-  - `Runtime/VoiceToken.cs`
+  - `Runtime/AnimalesePlayer.cs`
+  - `Samples~/Example/AnimaleseSampleTypewriter.cs`
 - **问题描述**：
-  当前外部调用 `AnimaleseParser.Parse(text)` 每次都会 `new VoiceTokenList()`。在长篇对话、频繁翻页的剧情游戏中，频繁分配会导致内存碎片。
-- **讨论要点**：
-  - 是否增加支持传入已存在列表的重载方法：
-    `public static void Parse(string text, VoiceTokenList outputList)`
-    在内部调用 `outputList.Clear()` 后复用，实现真正的端到端零分配？
+  原解析方法每次调用都分配新的容器对象，长篇对话频繁翻页时容易造成内存碎片，且无法配合对象池（如 `ListPool<T>`）复用。
+- **解决结果**：
+  - 在 `AnimaleseParser` 中增加了 `public static void Parse(string text, List<VoiceToken> results)` 零分配重载，支持外部预分配或对象池复用。
+  - `AnimalesePlayer.Play` 统一提升为面向抽象接口 `IReadOnlyList<VoiceToken>` 编程，灵活接纳任意列表或数组。
+  - 在 `AnimaleseSampleTypewriter` 中引入全局预分配列表 `_currentTokens`，实现了打字机解析播放全流程 0 GC 堆分配。
 
 ---
 
@@ -193,8 +185,8 @@
 
 ## 讨论建议与步骤
 
-1. **已解决条目**：`[BUG-01]`, `[PERF-01]`, `[FEAT-01]`。
-2. **待讨论条目推荐顺序**：
-   - 音频体验与状态机健壮性：**`[BUG-03]`**（掉帧爆音防范）与 **`[FEAT-02]`**（标点重音判定）。
-   - 彻底零 GC 改造：**`[PERF-02]`**, **`[PERF-03]`**, **`[FEAT-03]`**。
-   - 工程与扩展性：**`[BUG-02]`**, **`[PERF-04]`**, **`[FEAT-04]`**。
+1. **已解决条目**：`[BUG-01]`, `[BUG-02]`, `[BUG-03]`, `[PERF-01]`, `[PERF-03]`, `[FEAT-01]`, `[FEAT-03]`。
+2. **待讨论条目**：
+   - 彻底零 GC 改造（最后一步）：**`[PERF-02]`**（解析阶段单/双字符比对 0 GC）。
+   - 标点体验与语调调优：**`[FEAT-02]`**（标点重音边界判定）。
+   - 架构工程与扩展：**`[PERF-04]`**（滤波器组件管理）、**`[FEAT-04]`**（双音素多语言扩展）。
