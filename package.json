@@ -1,7 +1,7 @@
 {
   "name": "com.majulizi.animalese",
   "displayName": "Animalese",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "unity": "6000.6",
   "unityRelease": "0f1",
   "description": "A lightweight, zero-dependency, procedural 'Animalese' speech synthesizer for Unity dialogue systems with real-time typewriter synchronization.",
@@ -20,6 +20,7 @@
   },
   "licensesUrl": "https://github.com/curefate/Animalese-Unity/blob/master/LICENSE.md",
   "documentationUrl": "https://github.com/curefate/Animalese-Unity#readme",
+  "changelogUrl": "https://github.com/curefate/Animalese-Unity/blob/master/CHANGELOG.md",
   "samples": [
     {
       "displayName": "Example",
