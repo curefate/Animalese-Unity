@@ -9,8 +9,25 @@ namespace Majulizi.Animalese
     /// </summary>
     public static class AnimaleseParser
     {
-        // Common English digraphs matched in greedy order
-        private static readonly string[] Digraphs = { "ch", "sh", "th", "wh", "ph" };
+        // 26 个小写英文字母常驻常量池，避免运行时反复调用 c.ToString() 产生 GC 堆分配
+        private static readonly string[] LowerLetters = new string[26]
+        {
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+            "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
+        };
+
+        // 将两个 16 位字符打包为一个 32 位整型 Key，实现零堆分配检索
+        private static int Pack(char c1, char c2) => (c1 << 16) | c2;
+
+        // 常见英文双音素快速查找表（基于打包整型 Key，100% 零 GC，且支持灵活扩展任意双字符组合）
+        private static readonly Dictionary<int, string> DigraphLookup = new Dictionary<int, string>
+        {
+            [Pack('c', 'h')] = "ch",
+            [Pack('s', 'h')] = "sh",
+            [Pack('t', 'h')] = "th",
+            [Pack('w', 'h')] = "wh",
+            [Pack('p', 'h')] = "ph"
+        };
 
         /// <summary>
         /// Parses the input string and allocates a new List of VoiceTokens.
@@ -162,32 +179,25 @@ namespace Majulizi.Animalese
                     continue;
                 }
 
-                // 6. 英文复合音素贪心匹配 (ch, sh, th, wh, ph)
+                // 6. 英文复合音素贪心匹配 (ch, sh, th, wh, ph) - 0 GC 快速检索
                 if (i + 1 < length && IsAsciiLetter(c) && IsAsciiLetter(text[i + 1]))
                 {
-                    string twoChar = (char.ToLowerInvariant(c).ToString() + char.ToLowerInvariant(text[i + 1]));
-                    bool matchedDigraph = false;
-                    foreach (var digraph in Digraphs)
-                    {
-                        if (twoChar == digraph)
-                        {
-                            tokens.Add(VoiceToken.CreatePhoneme(digraph, i, c, pitchOffset: 0f, relativeDuration: 1.0f));
-                            i += 2;
-                            matchedDigraph = true;
-                            break;
-                        }
-                    }
+                    char c1 = char.ToLowerInvariant(c);
+                    char c2 = char.ToLowerInvariant(text[i + 1]);
 
-                    if (matchedDigraph)
+                    if (DigraphLookup.TryGetValue(Pack(c1, c2), out string matchedDigraph))
                     {
+                        tokens.Add(VoiceToken.CreatePhoneme(matchedDigraph, i, c, pitchOffset: 0f, relativeDuration: 1.0f));
+                        i += 2;
                         continue;
                     }
                 }
 
-                // 7. 单字母英文匹配 ('a' ~ 'z')
+                // 7. 单字母英文匹配 ('a' ~ 'z') - 0 GC 常量池查表
                 if (IsAsciiLetter(c))
                 {
-                    string phonemeId = char.ToLowerInvariant(c).ToString();
+                    int letterIndex = (c >= 'a' && c <= 'z') ? (c - 'a') : (c - 'A');
+                    string phonemeId = LowerLetters[letterIndex];
                     tokens.Add(VoiceToken.CreatePhoneme(phonemeId, i, c, pitchOffset: 0f, relativeDuration: 1.0f));
                     i++;
                     continue;

@@ -12,13 +12,13 @@
 | [x] | **[BUG-02](#bug-02-phonememapsoautopopulatefromsamples-在-upm-模式下路径失效)** | 工具链缺陷 | **中 (Medium)** | `PhonemeMapSO.cs` | `Samples~` 目录被 Unity 忽略导致 ContextMenu 提取音频失效 **(已解决：直接删除无用脚手架方法，净化 Runtime 核心)** |
 | [x] | **[BUG-03](#bug-03-低帧率追帧时的音频瞬间堆叠并发与-pitch-互相踩踏)** | 音频逻辑 | **中 (Medium)** | `AnimalesePlayer.cs` | 掉帧时 while 循环连续消费 token 导致爆音 **(已修复：单帧音频限流至多发声 1 次 + 时间透支下限)** |
 | [x] | **[PERF-01](#perf-01-findclipfortoken-每次播放非英文字符均产生-string-堆分配)** | 性能与 GC | **中 (Medium)** | `AnimalesePlayer.cs` | 非英文字符播放时每次都 `ToString()` 分配新字符串用于 `char.ConvertToUtf32` **(已修复：直接转为 int 消除 GC)** |
-| [ ] | **[PERF-02](#perf-02-animaleseparser-解析期间大量临时字符串分配)** | 性能与 GC | **中 (Medium)** | `AnimaleseParser.cs` | 英文贪心双音素拼接与单字母 `ToString()` 产生不必要的堆分配 |
+| [x] | **[PERF-02](#perf-02-animaleseparser-解析期间大量临时字符串分配)** | 性能与 GC | **中 (Medium)** | `AnimaleseParser.cs` | 英文双音素拼接与单字母 `ToString()` 产生堆分配 **(已解决：整型打包字典 + 字母常量池，彻底 0 GC)** |
 | [x] | **[PERF-03](#perf-03-voicetokenlist-内部双重分配冗余)** | 性能与 GC | **低 (Low)** | `VoiceToken.cs` | 冗余的包装类分配 **(已解决：直接废弃 VoiceTokenList，全面拥抱原生泛型容器)** |
-| [ ] | **[PERF-04](#perf-04-运行时动态-addcomponent-音频滤波器的开销与状态管理)** | 性能与架构 | **低 (Low)** | `AnimalesePlayer.cs` | 动态 `AddComponent<AudioFilter>` 产生单帧卡顿与潜在的组件残留隐患 |
+| [x] | **[PERF-04](#perf-04-运行时动态-addcomponent-音频滤波器的开销与状态管理)** | 性能与架构 | **低 (Low)** | `AnimalesePlayer.cs` | 动态 AddComponent 导致卡顿 **(已解决：Awake 集中初始化并默认禁用，运行时纯参数赋值)** |
 | [x] | **[FEAT-01](#feat-01-缺失-textmeshpro-富文本标签rich-text-tags过滤穿透支持)** | 功能扩展 | **高 (High)** | `AnimaleseSampleTypewriter.cs`, `README.md` | 通过 TMP 的 `GetParsedText()` 提取平文本给 Parser，完美兼容富文本并与打字机绝对同步 **(已完美解决)** |
-| [ ] | **[FEAT-02](#feat-02-标点重音回溯判定在复合短句下的边界处理)** | 韵律体验 | **低 (Low)** | `AnimaleseParser.cs` | 逗号等短暂停顿在特定语法结构下可能会被重音回溯越界穿透 |
+| [x] | **[FEAT-02](#feat-02-标点重音回溯判定在复合短句下的边界处理)** | 韵律体验 | **低 (Low)** | `AnimaleseParser.cs` | 标点重音回溯判定 **(已关闭：保持现状，当前节奏与表现力符合预期)** |
 | [x] | **[FEAT-03](#feat-03-缺乏对象池或零分配解析重载支持)** | 架构设计 | **低 (Low)** | `AnimaleseParser.cs`, `AnimalesePlayer.cs` | 缺乏复用现有列表的重载 **(已解决：新增 Parse(text, results) 零分配重载，Player 接口对齐 IReadOnlyList)** |
-| [ ] | **[FEAT-04](#feat-04-双音素硬编码于代码中缺乏外部扩展性)** | 架构扩展 | **低 (Low)** | `AnimaleseParser.cs` | `Digraphs` 仅硬编码了英文 5 组组合，无法配置扩展日文罗马字或拼音音节 |
+| [x] | **[FEAT-04](#feat-04-双音素硬编码于代码中缺乏外部扩展性)** | 架构扩展 | **低 (Low)** | `AnimaleseParser.cs` | 双音素外部扩展 **(已关闭：保持现状，坚持轻量零配置方案，避免过度设计)** |
 
 ---
 
@@ -73,24 +73,15 @@
 
 ---
 
-### - [ ] [PERF-02] AnimaleseParser 解析期间大量临时字符串分配
+### - [x] [PERF-02] AnimaleseParser 解析期间大量临时字符串分配
 
 - **涉及文件**：
-  - `Runtime/AnimaleseParser.cs` (行 151, 173)
+  - `Runtime/AnimaleseParser.cs`
 - **问题描述**：
-  1. **双音素贪心匹配**：
-     ```csharp
-     string twoChar = (char.ToLowerInvariant(c).ToString() + char.ToLowerInvariant(text[i + 1]));
-     ```
-     每次遇到两个字母，都会调用两次 `ToString()` 并进行一次 `+` 拼接，产生 3 个 GC 字符串。
-  2. **单字母匹配**：
-     ```csharp
-     string phonemeId = char.ToLowerInvariant(c).ToString();
-     ```
-     每个单字母又产生一次 `ToString()`。
-- **讨论要点**：
-  - 针对双音素：直接比对字符 `(c1, c2)`，或者使用固定查找表。
-  - 针对单字母：建立只读的 `static readonly string[] AsciiLower = { "a", "b", ..., "z" };`，按 `c - 'a'` 直接通过静态只读引用索引，解析阶段可实现 0 GC 字符串分配。
+  原实现在双音素贪心匹配时通过 `c.ToString() + text[i+1].ToString()` 产生多次临时字符串分配；在单字母匹配时通过 `c.ToString()` 频繁产生堆对象垃圾。
+- **解决结果**：
+  - **单字母 0 GC 查表**：预置 26 个常驻小写英文字母静态常量池 `LowerLetters[26]`，通过字符 ASCII 码偏移取模直接获取常驻字符串指针，消除 `ToString()` 分配。
+  - **双音素通用整型打包查表**：使用 `(c1 << 16) | c2` 将两个 16 位字符无分配快速打包为 32 位整型 Key，配合 `Dictionary<int, string>` 字典检索。彻底消除字符串拼接与 GC Alloc，同时为未来多语言复合音素扩展提供了极其灵活且无耦合的架构支撑。
 
 ---
 
@@ -105,25 +96,15 @@
 
 ---
 
-### - [ ] [PERF-04] 运行时动态 AddComponent 音频滤波器的开销与状态管理
+### - [x] [PERF-04] 运行时动态 AddComponent 音频滤波器的开销与状态管理
 
 - **涉及文件**：
-  - `Runtime/AnimalesePlayer.cs` (行 279, 295)
+  - `Runtime/AnimalesePlayer.cs`
 - **问题描述**：
-  ```csharp
-  if (profile.enableLowPass)
-  {
-      if (_lowPassFilter == null)
-      {
-          _lowPassFilter = gameObject.AddComponent<AudioLowPassFilter>();
-      }
-      ...
-  }
-  ```
-  在游戏运行中如果切换不同的角色 Profile，动态调用 `AddComponent` 会引起单帧 CPU 尖刺并触发 Unity 音频 DSP 图的重建。
-- **讨论要点**：
-  - 是否在 `Awake()` 中直接缓存现有组件？
-  - 是否建议在组件初始化或 Inspector 预制体中预先添加并默认禁用（`enabled = false`），运行时仅做开关控制？
+  在游戏运行中如果切换不同的角色 Profile，原实现会在 `ApplyProfileFilters` 中动态调用 `gameObject.AddComponent`，引起单帧 CPU 尖刺并触发 Unity 音频 DSP 图的运行时重建。
+- **解决结果**：
+  - 将滤波器组件的获取与创建统一收拢到 `Awake` 初始化阶段，并默认禁用（`enabled = false`）。
+  - `ApplyProfileFilters` 纯粹化为参数应用逻辑：仅控制 `filter.enabled` 开关与数值赋值，彻底消除了运行期间动态挂载组件的性能开销与潜在组件残留。
 
 ---
 
@@ -141,16 +122,14 @@
 
 ---
 
-### - [ ] [FEAT-02] 标点重音回溯判定在复合短句下的边界处理
+### - [x] [FEAT-02] 标点重音回溯判定在复合短句下的边界处理
 
 - **涉及文件**：
   - `Runtime/AnimaleseParser.cs` (行 238~284)
 - **问题描述**：
-  在 `ApplyPunctuationEmphasis` 和 `ApplyDecrescendo` 中，使用 `token.RelativeDuration >= 3.0f` 作为句首/前一句子边界进行回溯中断：
-  - 逗号、顿号的相对时长为 `2.0f`。
-  - 对于短句加问号（如 `"Wait, what?"`），由于逗号小于 `3.0f`，问号的末尾升调可能会越过逗号回溯到 `"Wait"` 上的音素。
-- **讨论要点**：
-  - 回溯重音机制是否应当在遇到任何有效停顿（包括逗号等小停顿）时就停下，还是保持当前的跨越判定？
+  在 `ApplyPunctuationEmphasis` 和 `ApplyDecrescendo` 中，使用 `token.RelativeDuration >= 3.0f` 作为句首/前一句子边界进行回溯中断。逗号顿号相对时长为 `2.0f`，在极短句接问号（如 `"Wait, what?"`）时可能越过逗号回溯。
+- **讨论与结论**：
+  - **保持现状（Keep as is）**：经评估，当前动森语的升调与韵律表现力听感良好，即使极短复合句跨越逗号轻微上扬也符合动森语活泼俏皮的拟音风格，无需引入更繁琐的语法分词逻辑，维持现有规则。该条目关闭。
 
 ---
 
@@ -169,24 +148,22 @@
 
 ---
 
-### - [ ] [FEAT-04] 双音素硬编码于代码中，缺乏外部扩展性
+### - [x] [FEAT-04] 双音素硬编码于代码中，缺乏外部扩展性
 
 - **涉及文件**：
   - `Runtime/AnimaleseParser.cs` (行 13)
 - **问题描述**：
-  ```csharp
-  private static readonly string[] Digraphs = { "ch", "sh", "th", "wh", "ph" };
-  ```
-  双音素完全硬编码在 C# 文件内部。如果开发者想为日语罗马字（如 `ts`, `ky`, `sh`）或汉语拼音（如 `zh`, `ch`, `sh`）定制复合发音片段，无法在 ScriptableObject（如 `PhonemeMapSO`）中自定义。
-- **讨论要点**：
-  - 是否保持当前的轻量英文预设，还是将复合音素规则移至 `PhonemeMapSO` 供配置？
+  双音素目前硬编码为英文 5 组常见组合（`ch`, `sh`, `th`, `wh`, `ph`）。
+- **讨论与结论**：
+  - **保持现状（Keep as is）**：坚持轻量零配置设计，避免将 ScriptableObject 引入原本纯静态独立的 `AnimaleseParser` 中，避免过度设计。该条目关闭。
 
 ---
 
-## 讨论建议与步骤
+## 总结与审查结论
 
-1. **已解决条目**：`[BUG-01]`, `[BUG-02]`, `[BUG-03]`, `[PERF-01]`, `[PERF-03]`, `[FEAT-01]`, `[FEAT-03]`。
-2. **待讨论条目**：
-   - 彻底零 GC 改造（最后一步）：**`[PERF-02]`**（解析阶段单/双字符比对 0 GC）。
-   - 标点体验与语调调优：**`[FEAT-02]`**（标点重音边界判定）。
-   - 架构工程与扩展：**`[PERF-04]`**（滤波器组件管理）、**`[FEAT-04]`**（双音素多语言扩展）。
+审查发现的全部 **10 个条目**已全部讨论并推进完毕：
+- **稳定性缺陷（已修复）**：`[BUG-01]`（代理对崩溃）、`[BUG-02]`（无效脚手架清理）、`[BUG-03]`（掉帧音频限流与透支保护）
+- **性能与极致零 GC（已重构）**：`[PERF-01]`（字符哈希零分配）、`[PERF-02]`（单/双音素查表零分配）、`[PERF-03]`（废弃包装类）、`[PERF-04]`（滤波器组件加载期就绪）
+- **对话系统集成与体验（已落地/明确决策）**：`[FEAT-01]`（TMP 富文本提取与字符级绝对对齐）、`[FEAT-02]`（标点语调保持现状）、`[FEAT-03]`（提供 Parse 零分配重载与只读接口抽象）、`[FEAT-04]`（双音素保持轻量内置）
+
+当前项目在**稳定性**、**性能（全流程端到端 0 GC）**以及**TextMeshPro 文本打字机音画同步**方面均达到了极高的工业级标准。

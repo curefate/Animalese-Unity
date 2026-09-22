@@ -73,8 +73,25 @@ namespace Majulizi.Animalese
                 _audioSource.loop = false;
             }
 
+            // Ensure audio filter components are ready and disabled by default to avoid runtime AddComponent calls
             _lowPassFilter = GetComponent<AudioLowPassFilter>();
+            if (_lowPassFilter == null)
+            {
+                _lowPassFilter = gameObject.AddComponent<AudioLowPassFilter>();
+            }
+            _lowPassFilter.enabled = false;
+
             _highPassFilter = GetComponent<AudioHighPassFilter>();
+            if (_highPassFilter == null)
+            {
+                _highPassFilter = gameObject.AddComponent<AudioHighPassFilter>();
+            }
+            _highPassFilter.enabled = false;
+
+            if (_profile != null)
+            {
+                ApplyProfileFilters(_profile);
+            }
         }
 
         private void Update()
@@ -276,43 +293,28 @@ namespace Majulizi.Animalese
 
         private void ApplyProfileFilters(VoiceProfileSO profile)
         {
-            if (profile == null)
+            // Low-pass filter
+            if (_lowPassFilter != null)
             {
-                if (_lowPassFilter != null) _lowPassFilter.enabled = false;
-                if (_highPassFilter != null) _highPassFilter.enabled = false;
-                return;
+                bool enableLowPass = profile != null && profile.enableLowPass;
+                _lowPassFilter.enabled = enableLowPass;
+                if (enableLowPass)
+                {
+                    _lowPassFilter.cutoffFrequency = profile.lowPassCutoff;
+                    _lowPassFilter.lowpassResonanceQ = profile.lowPassResonance;
+                }
             }
 
-            // Low-pass filter handling
-            if (profile.enableLowPass)
+            // High-pass filter
+            if (_highPassFilter != null)
             {
-                if (_lowPassFilter == null)
+                bool enableHighPass = profile != null && profile.enableHighPass;
+                _highPassFilter.enabled = enableHighPass;
+                if (enableHighPass)
                 {
-                    _lowPassFilter = gameObject.AddComponent<AudioLowPassFilter>();
+                    _highPassFilter.cutoffFrequency = profile.highPassCutoff;
+                    _highPassFilter.highpassResonanceQ = profile.highPassResonance;
                 }
-                _lowPassFilter.enabled = true;
-                _lowPassFilter.cutoffFrequency = profile.lowPassCutoff;
-                _lowPassFilter.lowpassResonanceQ = profile.lowPassResonance;
-            }
-            else if (_lowPassFilter != null)
-            {
-                _lowPassFilter.enabled = false;
-            }
-
-            // High-pass filter handling
-            if (profile.enableHighPass)
-            {
-                if (_highPassFilter == null)
-                {
-                    _highPassFilter = gameObject.AddComponent<AudioHighPassFilter>();
-                }
-                _highPassFilter.enabled = true;
-                _highPassFilter.cutoffFrequency = profile.highPassCutoff;
-                _highPassFilter.highpassResonanceQ = profile.highPassResonance;
-            }
-            else if (_highPassFilter != null)
-            {
-                _highPassFilter.enabled = false;
             }
         }
 
